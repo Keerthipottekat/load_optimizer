@@ -25,14 +25,16 @@ class LoadOptimizer:
     Uses greedy algorithm: reduces lowest-priority loads first.
     """
     
-    def __init__(self, transformer_capacity=150.0):
+    def __init__(self, transformer_capacity=150.0, algorithm="proportional"):
         """
         Initialize the optimizer.
         
         Args:
             transformer_capacity: Maximum safe load (units)
+            algorithm: 'proportional' or 'greedy'
         """
         self.capacity = transformer_capacity
+        self.algorithm = algorithm
         
         # Zone priorities: lower value = higher priority (cannot be shed)
         self.zone_priorities = {
@@ -91,39 +93,75 @@ class LoadOptimizer:
         # Overload detected - begin load shedding
         actions.append(f"OVERLOAD DETECTED: {predicted_load:.2f} > {self.capacity:.2f}")
         
-        # Sort zones by priority (highest priority last - will be reduced last)
-        zones_by_priority = sorted(
-            self.zone_priorities.items(),
-            key=lambda x: x[1],
-            reverse=True  # Start with lowest priority first
-        )
-        
         current_total = sum(optimized_loads.values())
         deficit = current_total - self.capacity
         
-        # Greedy load shedding
-        for zone_name, priority in zones_by_priority:
-            if deficit <= 0:
-                break
+        if self.algorithm == "greedy":
+            # Greedy load shedding
+            zones_by_priority = sorted(
+                self.zone_priorities.items(),
+                key=lambda x: x[1],
+                reverse=True  # Start with lowest priority first
+            )
             
-            # Hospital (priority 1) is never reduced
-            if zone_name == 'hospital':
-                continue
-            
-            current_demand = optimized_loads[zone_name]
-            
-            # Try to shed as much as possible from this zone
-            if current_demand > 0:
-                # Shed minimum of (available demand, deficit)
-                shed_amount = min(current_demand, deficit)
+            for zone_name, priority in zones_by_priority:
+                if deficit <= 0:
+                    break
                 
-                optimized_loads[zone_name] -= shed_amount
-                deficit -= shed_amount
+                # Hospital (priority 1) is never reduced
+                if zone_name == 'hospital':
+                    continue
                 
-                actions.append(
-                    f"Reduced {zone_name}: {current_demand:.2f} → {optimized_loads[zone_name]:.2f} "
-                    f"(shed {shed_amount:.2f})"
-                )
+                current_demand = optimized_loads[zone_name]
+                if current_demand > 0:
+                    shed_amount = min(current_demand, deficit)
+                    optimized_loads[zone_name] -= shed_amount
+                    deficit -= shed_amount
+                    
+                    actions.append(
+                        f"Reduced {zone_name}: {current_demand:.2f} → {optimized_loads[zone_name]:.2f} "
+                        f"(shed {shed_amount:.2f})"
+                    )
+                    
+        else:
+            # Proportional load shedding based on priority weight
+            # Calculate total shed amounts per zone to log later
+            total_shed_per_zone = {z: 0.0 for z in current_loads.keys()}
+            sheddable_zones = [z for z in self.zone_priorities.keys() if z != 'hospital' and optimized_loads[z] > 0.01]
+            
+            while deficit > 0.01 and len(sheddable_zones) > 0:
+                total_weight = sum(self.zone_priorities[z] for z in sheddable_zones)
+                pass_deficit = deficit
+                shed_in_pass = False
+                
+                # Shed from lowest priority to highest
+                for zone_name in sorted(sheddable_zones, key=lambda z: self.zone_priorities[z], reverse=True):
+                    weight = self.zone_priorities[zone_name]
+                    proportion = weight / total_weight
+                    
+                    target_shed = pass_deficit * proportion
+                    actual_shed = min(optimized_loads[zone_name], target_shed)
+                    
+                    if actual_shed > 0.01:
+                        optimized_loads[zone_name] -= actual_shed
+                        deficit -= actual_shed
+                        total_shed_per_zone[zone_name] += actual_shed
+                        shed_in_pass = True
+                
+                if not shed_in_pass:
+                    break
+                    
+                sheddable_zones = [z for z in sheddable_zones if optimized_loads[z] > 0.01]
+                
+            # Log actions sorted by priority (lowest priority first)
+            for zone_name in sorted(total_shed_per_zone.keys(), key=lambda z: self.zone_priorities.get(z, 99), reverse=True):
+                amount = total_shed_per_zone[zone_name]
+                if amount > 0.01:
+                    original_val = original_loads[zone_name]
+                    actions.append(
+                        f"Reduced {zone_name}: {original_val:.2f} → {optimized_loads[zone_name]:.2f} "
+                        f"(shed {amount:.2f})"
+                    )
         
         # If still overloaded after shedding all shedable loads
         if deficit > 0:

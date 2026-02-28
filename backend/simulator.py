@@ -82,13 +82,18 @@ class DemandSimulator:
         
         return load
     
-    def generate_24h_profile(self):
+    def generate_24h_profile(self, scenario="normal"):
         """
-        Generate 24-hour demand profile for all zones.
+        Generate 24-hour demand profile for all zones with optional scenario multipliers.
+        
+        Args:
+            scenario: One of "normal", "heatwave", "high_ev", "emergency"
         
         Returns:
             pd.DataFrame: With columns for each zone + total load
         """
+        
+        # synthetic path
         hourly_data = np.arange(24)
         
         data = {
@@ -107,6 +112,17 @@ class DemandSimulator:
             noise = np.random.normal(0, 0.5, len(df))
             df[col] = df[col] + noise
             df[col] = df[col].clip(lower=0)  # Ensure non-negative
+        
+        # Apply scenario multipliers
+        if scenario == "heatwave":
+            df['residential'] *= 1.25
+            df['commercial'] *= 1.15
+        elif scenario == "high_ev":
+            df['ev_charging'] *= 2.0
+        elif scenario == "emergency":
+            df['residential'] *= 1.15
+            df['commercial'] *= 1.10
+            df['ev_charging'] *= 1.5
         
         # Calculate total load
         df['total_load'] = df[noise_cols].sum(axis=1)

@@ -304,7 +304,7 @@ def main():
         """
         **System Features:**
         - 🔮 Load Prediction: Machine Learning (LinearRegression)
-        - 🎯 Optimization: Constraint-based greedy algorithm
+        - 🎯 Optimization: Proportional Fair Share Load Shedding
         - 🏥 Critical Protection: Hospital loads never reduced
         - 📊 Real-time Monitoring: Zone-wise tracking & alerts
         - 🚨 Automated Response: Load shedding when overload detected

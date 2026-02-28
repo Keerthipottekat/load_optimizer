@@ -1,15 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>AI-Driven Transformer Load Optimizer</title>
 
     <!-- Bootstrap CSS -->
-    <link
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
-        rel="stylesheet"
-    >
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Custom Styling -->
     <style>
@@ -24,7 +22,7 @@
         }
 
         .metric-card {
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
             border-radius: 8px;
         }
 
@@ -39,62 +37,184 @@
 
 <body>
 
-<div class="container py-4">
+    <div class="container py-4">
 
-    <!-- Title -->
-    <h1 class="text-center mb-4 header-title">
-        ⚡ AI-Driven Transformer Load Optimization System
-    </h1>
+        <!-- Title -->
+        <h1 class="text-center mb-1 header-title">
+            ⚡ AI-Driven Transformer Load Optimization System
+        </h1>
+        <h5 class="text-center mb-4 text-success">
+            <span class="badge bg-success">Active</span> Proportional Fair Share Load Shedding Algorithm
+        </h5>
 
-    <!-- Run Button -->
-    <div class="d-flex justify-content-center mb-4">
-        <button id="runBtn" class="btn btn-primary btn-lg px-4">
-            Run Simulation
-        </button>
-    </div>
-
-    <!-- Status Section -->
-    <div id="statusSection" class="mb-4 text-center"></div>
-
-    <!-- Metrics Section -->
-    <div id="metricsSection" class="row g-3 mb-4"></div>
-
-    <!-- Chart Section -->
-    <div class="card p-4 mb-4">
-        <h5 class="text-center mb-3">24-Hour Load Analysis</h5>
-        <div class="chart-container">
-            <canvas id="loadChart"></canvas>
+        <!-- Run Button & Scenario Selection -->
+        <div class="d-flex justify-content-center gap-3 mb-4 align-items-center flex-wrap">
+            <div>
+                <label for="scenarioSelect" class="form-label me-2">Scenario:</label>
+                <select id="scenarioSelect" class="form-select form-select-sm" style="width:160px;">
+                    <option value="normal">Normal</option>
+                    <option value="heatwave" selected>Heatwave</option>
+                    <option value="high_ev">High EV Demand</option>
+                    <option value="emergency">Emergency</option>
+                </select>
+            </div>
+            <button id="runBeforeBtn" class="btn btn-danger btn-lg px-3 fs-6">
+                📉 Run (Before)
+            </button>
+            <button id="runAfterBtn" class="btn btn-success btn-lg px-3 fs-6">
+                📈 Run (After)
+            </button>
         </div>
-    </div>
 
-    <!-- Zone Allocation Table -->
-    <div class="card p-4">
-        <h5 class="mb-3">Zone Allocation Details</h5>
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover" id="zoneTable">
-                <thead class="table-light">
-                    <tr>
-                        <th>Hour</th>
-                        <th>Hospital</th>
-                        <th>Residential</th>
-                        <th>Commercial</th>
-                        <th>EV Charging</th>
-                        <th>Total</th>
-                        <th>Overloaded?</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <!-- Status Section -->
+        <div id="statusSection" class="mb-4 text-center"></div>
+
+        <!-- Metrics Section -->
+        <div id="metricsSection" class="row g-3 mb-4"></div>
+
+        <!-- Chart Section -->
+        <div class="card p-4 mb-4">
+            <h5 class="text-center mb-3">24-Hour Load Analysis</h5>
+            <div class="chart-container">
+                <canvas id="loadChart"></canvas>
+            </div>
         </div>
+
+        <!-- Zone Allocation Table -->
+        <div class="card p-4">
+            <h5 class="mb-3">Zone Allocation Details</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="zoneTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Hour</th>
+                            <th>Hospital</th>
+                            <th>Residential</th>
+                            <th>Commercial</th>
+                            <th>EV Charging</th>
+                            <th>Total</th>
+                            <th>Overloaded?</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- AI Load Shedding Schedule Section                            -->
+        <!-- ============================================================ -->
+        <hr class="my-5">
+
+        <h2 class="text-center mb-4 header-title">
+            🤖 AI Load Shedding Schedule
+        </h2>
+
+        <!-- Operator Input Form -->
+        <div class="card p-4 mb-4 border-primary">
+            <h5 class="mb-3">Operator Inputs</h5>
+            <form id="scheduleForm" class="row g-3 align-items-end">
+
+                <!-- Scenario -->
+                <div class="col-md-3">
+                    <label for="schedScenario" class="form-label">Scenario</label>
+                    <select id="schedScenario" class="form-select">
+                        <option value="normal">Normal</option>
+                        <option value="heatwave">Heatwave</option>
+                        <option value="high_ev">High EV Demand</option>
+                        <option value="emergency">Emergency</option>
+                    </select>
+                </div>
+
+                <!-- Capacity -->
+                <div class="col-md-2">
+                    <label for="schedCapacity" class="form-label">Capacity (units)</label>
+                    <input type="number" id="schedCapacity" class="form-control" value="150" min="50" max="5000"
+                        step="10">
+                </div>
+
+                <!-- Protected Zones -->
+                <div class="col-md-4">
+                    <label class="form-label">Protected Zones</label>
+                    <div class="d-flex flex-wrap gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input sched-protected" type="checkbox" value="hospital"
+                                id="protHospital" checked>
+                            <label class="form-check-label" for="protHospital">Hospital</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input sched-protected" type="checkbox" value="residential"
+                                id="protResidential">
+                            <label class="form-check-label" for="protResidential">Residential</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input sched-protected" type="checkbox" value="commercial"
+                                id="protCommercial">
+                            <label class="form-check-label" for="protCommercial">Commercial</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input sched-protected" type="checkbox" value="ev_charging"
+                                id="protEV">
+                            <label class="form-check-label" for="protEV">EV Charging</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Max Outage Hours -->
+                <div class="col-md-2">
+                    <label for="schedMaxOutage" class="form-label">Max Outage Hrs</label>
+                    <input type="number" id="schedMaxOutage" class="form-control" value="2" min="0" max="24" step="1">
+                </div>
+
+                <!-- Submit -->
+                <div class="col-md-1 d-grid">
+                    <button type="submit" id="schedRunBtn" class="btn btn-success btn-lg">
+                        Run
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Schedule Status -->
+        <div id="schedStatus" class="mb-4 text-center"></div>
+
+        <!-- Schedule Metrics -->
+        <div id="schedMetrics" class="row g-3 mb-4"></div>
+
+        <!-- Schedule Chart -->
+        <div id="schedChartCard" class="card p-4 mb-4" style="display:none;">
+            <h5 class="text-center mb-3">24-Hour Shedding Schedule</h5>
+            <div class="chart-container">
+                <canvas id="schedChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Schedule Table -->
+        <div id="schedTableCard" class="card p-4" style="display:none;">
+            <h5 class="mb-3">Hourly Shedding Details</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="schedTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Hour</th>
+                            <th>Predicted Load</th>
+                            <th>Overloaded?</th>
+                            <th>Zones Shed</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
-</div>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- Your Script -->
-<script src="script.js"></script>
+    <!-- Your Script -->
+    <script src="script.js"></script>
 
 </body>
+
 </html>

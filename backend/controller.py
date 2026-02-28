@@ -46,13 +46,14 @@ class SystemController:
     Integrates simulator, predictor, and optimizer.
     """
     
-    def __init__(self, transformer_capacity=150.0, verbose=True):
+    def __init__(self, transformer_capacity=150.0, verbose=True, algorithm="proportional"):
         """
         Initialize the system controller.
         
         Args:
             transformer_capacity: Max safe transformer load (units)
             verbose: Whether to log detailed information
+            algorithm: Load shedding algorithm ('proportional' or 'greedy')
         """
         self.capacity = transformer_capacity
         self.verbose = verbose
@@ -60,10 +61,10 @@ class SystemController:
         # Initialize components
         self.simulator = DemandSimulator()
         self.predictor = LoadPredictionModel()
-        self.optimizer = LoadOptimizer(transformer_capacity=transformer_capacity)
+        self.optimizer = LoadOptimizer(transformer_capacity=transformer_capacity, algorithm=algorithm)
         
         # Generate and train on 24-hour profile
-        self.demand_profile = self.simulator.generate_24h_profile()
+        self.demand_profile = self.simulator.generate_24h_profile(scenario="normal")
         self.predictor.train(self.demand_profile)
         
         # System history
@@ -238,6 +239,113 @@ class SystemController:
         }
         
         return pd.DataFrame(data)
+
+    # ------------------------------------------------------------------
+    # AI-assisted load shedding schedule
+    # ------------------------------------------------------------------
+
+    def recommend_schedule(
+        self,
+        scenario: str = "normal",
+        capacity: float = 150.0,
+        protected_zones: list = None,
+        max_outage_hours_per_zone: int = 2,
+    ) -> dict:
+        """Generate a 24-hour load shedding schedule.
+
+        For each hour the method predicts total load.  When the predicted load
+        exceeds *capacity*, zones are shed in order of lowest priority / highest
+        consumption while honouring *protected_zones* and the per-zone outage
+        limit.
+
+        Args:
+            scenario: Demand scenario (normal / heatwave / high_ev / emergency).
+            capacity: Transformer capacity threshold for this schedule.
+            protected_zones: Zone names that must never be shed (case-insensitive).
+            max_outage_hours_per_zone: Maximum hours any single zone may be shed.
+
+        Returns:
+            dict with keys: schedule, overload_hours_prevented,
+            estimated_energy_saved, grid_stability_score.
+        """
+        if protected_zones is None:
+            protected_zones = []
+        protected_set = {z.lower() for z in protected_zones}
+
+        # Regenerate demand for requested scenario & retrain predictor
+        profile = self.simulator.generate_24h_profile(scenario=scenario)
+        self.predictor.train(profile)
+
+        # Zone priorities from the existing optimizer (lower = higher priority)
+        zone_priorities = self.optimizer.zone_priorities  # dict[str, int]
+
+        # Per-zone outage tracking
+        outage_count: Dict[str, int] = {z: 0 for z in zone_priorities}
+
+        schedule = []
+        overload_hours_prevented = 0
+        total_energy_saved = 0.0
+
+        for hour in range(24):
+            row = profile.iloc[hour]
+            current_loads: Dict[str, float] = {
+                "hospital": float(row["hospital"]),
+                "residential": float(row["residential"]),
+                "commercial": float(row["commercial"]),
+                "ev_charging": float(row["ev_charging"]),
+            }
+
+            predicted_load = self.predictor.predict_next_hour(hour, current_loads)
+            zones_shed: list = []
+
+            if predicted_load > capacity:
+                # Build a list of sheddable zones sorted by
+                # lowest priority first, then highest consumption first.
+                sheddable = [
+                    (name, current_loads[name])
+                    for name, _prio in sorted(
+                        zone_priorities.items(), key=lambda x: x[1], reverse=True
+                    )
+                    if name.lower() not in protected_set
+                    and outage_count[name] < max_outage_hours_per_zone
+                    and current_loads[name] > 0
+                ]
+
+                remaining = predicted_load
+                for zone_name, zone_load in sheddable:
+                    if remaining <= capacity:
+                        break
+                    shed_amount = min(zone_load, remaining - capacity)
+                    remaining -= shed_amount
+                    total_energy_saved += shed_amount
+                    outage_count[zone_name] += 1
+                    zones_shed.append(zone_name)
+
+                if remaining <= capacity:
+                    overload_hours_prevented += 1
+
+            schedule.append({
+                "hour": hour,
+                "predicted_load": round(predicted_load, 2),
+                "zones_shed": zones_shed,
+            })
+
+        # Grid stability score: fraction of hours that are NOT overloaded
+        # after shedding (1.0 = perfect, 0.0 = all hours still overloaded).
+        total_overload_hours = sum(
+            1 for entry in schedule if entry["predicted_load"] > capacity
+        )
+        resolved = overload_hours_prevented
+        grid_stability_score = round(
+            1.0 - (total_overload_hours - resolved) / 24, 4
+        )
+
+        return {
+            "schedule": schedule,
+            "overload_hours_prevented": overload_hours_prevented,
+            "estimated_energy_saved": round(total_energy_saved, 2),
+            "grid_stability_score": grid_stability_score,
+        }
 
 
 def main():
