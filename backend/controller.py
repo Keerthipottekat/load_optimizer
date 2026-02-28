@@ -9,9 +9,9 @@ from typing import Dict, List
 import pandas as pd
 from datetime import datetime
 
-from simulator import DemandSimulator
-from model import LoadPredictionModel
-from optimizer import LoadOptimizer, OptimizationResult
+from .simulator import DemandSimulator
+from .model import LoadPredictionModel
+from .optimizer import LoadOptimizer, OptimizationResult
 
 
 @dataclass
